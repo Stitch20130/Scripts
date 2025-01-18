@@ -31,8 +31,6 @@ if player then
         function teleportCarToPosition(targetCFrame)
             if playerCar and playerCar.PrimaryPart then
                 playerCar:SetPrimaryPartCFrame(targetCFrame)
-            else
-                warn("Машина или её основная часть не найдена")
             end
         end
 
@@ -63,13 +61,6 @@ if player then
         while true do
             -- Телепортируем к монетам
             teleportToCoins()
-
-            -- После завершения всех телепортаций, скрипт будет повторять процесс
-            print("Завершено перемещение к монетам. Повторно запускаю телепортацию.")
         end
-    else
-        print("Машина для игрока с ID " .. playerID .. " не найдена.")
     end
-else
-    print("Игрок не найден.")
 end
