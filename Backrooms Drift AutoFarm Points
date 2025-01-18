@@ -1,0 +1,75 @@
+-- Скрипт телепортирует только тогда когда вы сядете в машину и запустите скрипт если хотите оставить скрипт просто перезайдите
+-- Получаем текущего игрока
+local player = game.Players.LocalPlayer
+
+-- Проверяем, что игрок существует
+if player then
+    -- Получаем ID игрока
+    local playerID = player.UserId
+
+    -- Функция для нахождения машины игрока по ID через атрибут PlayerId
+    function findPlayerCarByID(playerID)
+        for _, car in pairs(game.Workspace.Cars:GetChildren()) do
+            if car:IsA("Model") and car:GetAttribute("PlayerId") then
+                local ownerID = car:GetAttribute("PlayerId")
+                if ownerID == playerID then
+                    return car
+                end
+            end
+        end
+        return nil
+    end
+
+    -- Найти машину игрока
+    local playerCar = findPlayerCarByID(playerID)
+
+    if playerCar then
+        -- Установить PrimaryPart машины, если это не сделано в игре
+        playerCar.PrimaryPart = playerCar:FindFirstChild("Chassis")
+
+        -- Функция для телепортации машины по координатам
+        function teleportCarToPosition(targetCFrame)
+            if playerCar and playerCar.PrimaryPart then
+                playerCar:SetPrimaryPartCFrame(targetCFrame)
+            else
+                warn("Машина или её основная часть не найдена")
+            end
+        end
+
+        -- Функция для выполнения телепортации к каждой монете
+        function teleportToCoins()
+            -- Найти папку с коинами
+            local coinsFolder = game.Workspace.CoinsSetup.CoinsFolder
+
+            -- Проходим по всем коинам в папке
+            for _, coin in ipairs(coinsFolder:GetChildren()) do
+                -- Проверяем, если объект имеет CFrame (это должен быть коин)
+                if coin:IsA("BasePart") then
+                    -- Получаем текущие координаты коина
+                    local coinPosition = coin.Position
+
+                    -- Добавляем 5 единиц к высоте (y-координате)
+                    local newPosition = Vector3.new(coinPosition.X, coinPosition.Y + 1, coinPosition.Z)
+
+                    -- Телепортируем машину на новую позицию
+                    teleportCarToPosition(CFrame.new(newPosition))
+
+                    wait(0.2)  -- Небольшая задержка между телепортациями
+                end
+            end
+        end
+
+        -- Главная функция, которая будет повторяться, когда завершится обработка всех монет
+        while true do
+            -- Телепортируем к монетам
+            teleportToCoins()
+
+            -- После завершения всех телепортаций, скрипт будет повторять процесс
+            print("Завершено перемещение к монетам. Повторно запускаю телепортацию.")
+        end
+    else
+        print("Машина для игрока с ID " .. playerID .. " не найдена.")
+    end
+else
+    print("Игрок не найден.")
+end
