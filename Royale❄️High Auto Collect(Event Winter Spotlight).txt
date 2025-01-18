@@ -1,0 +1,29 @@
+local running = true
+
+local function gotoFolder()
+	while running do
+		local folderName = "ClientSnowflakeFolder"
+		local delay = 0.2
+		
+		local player = game.Players.LocalPlayer
+		local character = player.Character
+		if not character then return end
+		
+		local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+		if not humanoidRootPart then return end
+		
+		for _, v in pairs(workspace:GetDescendants()) do
+			if v.Name:lower() == folderName:lower() then
+				local children = v:GetChildren()
+				for i = 1, #children do
+					if not running then return end
+					humanoidRootPart.CFrame = children[i].CFrame
+					wait(delay)
+				end
+			end
+		end
+		wait(1)
+	end
+end
+
+gotoFolder()

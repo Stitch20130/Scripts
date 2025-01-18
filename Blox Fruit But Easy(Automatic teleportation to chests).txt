@@ -1,0 +1,31 @@
+-- Ссылка на игрока
+local player = game.Players.LocalPlayer
+-- Ссылка на пространство, где искать объект (например, рабочая зона)
+local workspace = game:GetService("Workspace")
+
+-- Функция для телепортации игрока к объекту
+local function teleportToChest(chest)
+    if chest and chest:IsA("BasePart") then
+        -- Телепортируем игрока к позиции "Chest"
+        player.Character:SetPrimaryPartCFrame(chest.CFrame)
+    end
+end
+
+-- Функция для поиска и отслеживания появления "Chest"
+local function findAndTeleportToChest()
+    while true do
+        -- Ищем объект "Chest" в рабочем пространстве
+        local chest = workspace:FindFirstChild("Chest")
+        
+        -- Если объект найден, телепортируемся к нему
+        if chest then
+            teleportToChest(chest)
+        end
+        
+        -- Ожидаем некоторое время перед следующей проверкой
+        wait(1)  -- Можно настроить задержку по вашему усмотрению
+    end
+end
+
+-- Запуск функции отслеживания
+findAndTeleportToChest()

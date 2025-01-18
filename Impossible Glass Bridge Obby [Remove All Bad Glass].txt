@@ -1,0 +1,14 @@
+local function CheckCanCollideAndDestroy(object)
+    if object:IsA("BasePart") and not object.CanCollide then
+        object:Destroy() -- Удаляем объект, если CanCollide = false
+    end
+end
+
+for i = 1, 100 do
+    for j = 1, 2 do
+        local object = workspace.Bridge[tostring(i)][tostring(j)]
+        if object then
+            CheckCanCollideAndDestroy(object)
+        end
+    end
+end
