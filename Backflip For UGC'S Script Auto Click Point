@@ -19,7 +19,7 @@ RunService.RenderStepped:Connect(function()
             game,
             1
         )
-        task.wait(0.1)
+        task.wait(0.5)
         game:GetService("VirtualInputManager"):SendMouseButtonEvent(
             buttonPath.AbsolutePosition.X + buttonPath.AbsoluteSize.X / 2,
             buttonPath.AbsolutePosition.Y + buttonPath.AbsoluteSize.Y / 2,
