@@ -1,0 +1,9 @@
+local args = {
+    [1] = "Sun Queen",
+    [2] = false,
+    [3] = "SEcrEt",
+    [4] = "Void",
+    [5] = "Huge"
+}
+
+game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("AddPet"):FireServer(unpack(args))
