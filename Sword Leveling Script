@@ -1,0 +1,423 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local screenGui = nil
+local autoAttackEnabled = false
+local autoAttackCoroutine = nil
+
+-- Список доступных врагов
+local enemyTypes = {
+    "Assassin", "AssassinBoss", "AssassinMaster", "Bandit", "BanditBerserker",
+    "BanditBoss", "BanditScout", "Barrels", "Crates", "DarkKnight",
+    "DarkSamurai", "Dummies", "Knight", "KnightBoss", "KnightCommander",
+    "Ninja", "NinjaBoss", "Pirate", "PirateBoss", "PirateBrute",
+    "PirateCaptain", "RedNinja", "Samurai", "SamuraiBoss", "SamuraiMaster",
+    "ShadowAssassin", "YellowNinja"
+}
+
+-- Настройки
+local settings = {
+    selectedEnemy = "AssassinBoss",
+    attackCount = 10
+}
+
+-- Функция для перетаскивания
+local function MakeDraggable(frame)
+    local dragToggle = nil
+    local dragSpeed = 0.25
+    local dragInput = nil
+    local dragStart = nil
+    local startPos = nil
+
+    local function UpdateInput(input)
+        local delta = input.Position - dragStart
+        local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                 startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        game:GetService("TweenService"):Create(frame, TweenInfo.new(0.1), {Position = position}):Play()
+    end
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragToggle = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragToggle = false
+                end
+            end)
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragToggle then
+            UpdateInput(input)
+        end
+    end)
+end
+
+-- Функция поиска врагов внутри папок
+local function FindEnemies(enemyName)
+    local enemiesFolder = workspace:WaitForChild("Enemies")
+    local enemyFolder = enemiesFolder:FindFirstChild(enemyName)
+    local enemyList = {}
+    
+    if enemyFolder then
+        for _, enemy in pairs(enemyFolder:GetChildren()) do
+            if enemy:IsA("Model") or enemy:IsA("BasePart") then
+                table.insert(enemyList, enemy)
+            end
+        end
+    end
+    
+    return enemyList
+end
+
+-- Функция поиска всех врагов
+local function FindAllEnemies()
+    local enemiesFolder = workspace:WaitForChild("Enemies")
+    local enemyList = {}
+    
+    for _, enemyType in pairs(enemyTypes) do
+        local enemyFolder = enemiesFolder:FindFirstChild(enemyType)
+        if enemyFolder then
+            for _, enemy in pairs(enemyFolder:GetChildren()) do
+                if enemy:IsA("Model") or enemy:IsA("BasePart") then
+                    table.insert(enemyList, enemy)
+                end
+            end
+        end
+    end
+    
+    return enemyList
+end
+
+-- Функция атаки
+local function AttackEnemies(enemyList, count)
+    if #enemyList == 0 then 
+        return false, "Враги не найдены!"
+    end
+
+    local character = player.Character
+    if not character then 
+        return false, "Персонаж не найден!"
+    end
+
+    for i = 1, count do
+        local args = {
+            [1] = {
+                ["Character"] = character,
+                ["Action"] = "Hit",
+                ["Hitbox"] = enemyList,
+                ["EffectPositon"] = character.HumanoidRootPart.CFrame,
+                ["Combo"] = 1
+            }
+        }
+        
+        ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("Combat"):FireServer(unpack(args))
+    end
+    
+    return true, "Атака выполнена!"
+end
+
+-- Функция автоатаки
+local function StartAutoAttack()
+    if autoAttackEnabled then return end
+    
+    autoAttackEnabled = true
+    autoAttackCoroutine = coroutine.create(function()
+        while autoAttackEnabled do
+            local enemies = FindEnemies(settings.selectedEnemy)
+            if #enemies > 0 then
+                AttackEnemies(enemies, settings.attackCount)
+            end
+            wait(0.5) -- Проверка каждые 0.5 секунды
+        end
+    end)
+    coroutine.resume(autoAttackCoroutine)
+end
+
+local function StopAutoAttack()
+    autoAttackEnabled = false
+    if autoAttackCoroutine then
+        coroutine.close(autoAttackCoroutine)
+        autoAttackCoroutine = nil
+    end
+end
+
+-- Создание GUI
+local function CreateGUI()
+    if screenGui then screenGui:Destroy() end
+
+    screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AttackSystemGUI"
+    screenGui.ResetOnSpawn = false
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 300, 0, 380) -- Увеличил высоту для новой кнопки
+    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -190)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    mainFrame.BorderSizePixel = 2
+    mainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    mainFrame.Active = true
+    mainFrame.Parent = screenGui
+    MakeDraggable(mainFrame)
+
+    -- Заголовок
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -10, 0, 40)
+    titleLabel.Position = UDim2.new(0, 5, 0, 5)
+    titleLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextSize = 20
+    titleLabel.Font = Enum.Font.SourceSansBold
+    titleLabel.Text = "Система атаки"
+    titleLabel.Parent = mainFrame
+
+    -- Кнопка закрытия
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 30, 0, 30)
+    closeButton.Position = UDim2.new(1, -35, 0, 10)
+    closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeButton.TextSize = 20
+    closeButton.Font = Enum.Font.SourceSansBold
+    closeButton.Parent = mainFrame
+
+    -- Выбор врага
+    local enemyLabel = Instance.new("TextLabel")
+    enemyLabel.Size = UDim2.new(0.5, -10, 0, 30)
+    enemyLabel.Position = UDim2.new(0, 10, 0, 55)
+    enemyLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    enemyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    enemyLabel.TextSize = 14
+    enemyLabel.Text = "Тип врага:"
+    enemyLabel.Parent = mainFrame
+
+    local enemyDropdown = Instance.new("TextButton")
+    enemyDropdown.Size = UDim2.new(0.5, -10, 0, 30)
+    enemyDropdown.Position = UDim2.new(0.5, 0, 0, 55)
+    enemyDropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    enemyDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+    enemyDropdown.TextSize = 14
+    enemyDropdown.Text = settings.selectedEnemy
+    enemyDropdown.Parent = mainFrame
+
+    -- Количество атак
+    local countLabel = Instance.new("TextLabel")
+    countLabel.Size = UDim2.new(0.5, -10, 0, 30)
+    countLabel.Position = UDim2.new(0, 10, 0, 95)
+    countLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    countLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    countLabel.TextSize = 14
+    countLabel.Text = "Кол-во атак:"
+    countLabel.Parent = mainFrame
+
+    local countInput = Instance.new("TextBox")
+    countInput.Size = UDim2.new(0.5, -10, 0, 30)
+    countInput.Position = UDim2.new(0.5, 0, 0, 95)
+    countInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    countInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    countInput.TextSize = 14
+    countInput.Text = tostring(settings.attackCount)
+    countInput.Parent = mainFrame
+
+    -- Кнопка атаки выбранного типа
+    local attackButton = Instance.new("TextButton")
+    attackButton.Size = UDim2.new(0.9, 0, 0, 30)
+    attackButton.Position = UDim2.new(0.05, 0, 0, 135)
+    attackButton.BackgroundColor3 = Color3.fromRGB(60, 90, 180)
+    attackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    attackButton.TextSize = 16
+    attackButton.Text = "Атаковать выбранных"
+    attackButton.Parent = mainFrame
+
+    -- Кнопка атаки всех
+    local attackAllButton = Instance.new("TextButton")
+    attackAllButton.Size = UDim2.new(0.9, 0, 0, 30)
+    attackAllButton.Position = UDim2.new(0.05, 0, 0, 175)
+    attackAllButton.BackgroundColor3 = Color3.fromRGB(120, 60, 180)
+    attackAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    attackAllButton.TextSize = 16
+    attackAllButton.Text = "Атаковать всех"
+    attackAllButton.Parent = mainFrame
+
+    -- Кнопка автоатаки
+    local autoAttackButton = Instance.new("TextButton")
+    autoAttackButton.Size = UDim2.new(0.9, 0, 0, 30)
+    autoAttackButton.Position = UDim2.new(0.05, 0, 0, 215)
+    autoAttackButton.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
+    autoAttackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    autoAttackButton.TextSize = 16
+    autoAttackButton.Text = "Автоатака выкл"
+    autoAttackButton.Parent = mainFrame
+
+    -- Статус
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(1, -10, 0, 25)
+    statusLabel.Position = UDim2.new(0, 5, 1, -18)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    statusLabel.TextSize = 14
+    statusLabel.Text = "Готов"
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+    statusLabel.Parent = mainFrame
+
+    -- Обработчики событий
+    closeButton.MouseButton1Click:Connect(function()
+        StopAutoAttack()
+        screenGui:Destroy()
+        screenGui = nil
+    end)
+
+    -- Атака выбранного типа
+    attackButton.MouseButton1Click:Connect(function()
+        local count = tonumber(countInput.Text)
+        if not count or count <= 0 then
+            statusLabel.Text = "Неверное количество атак!"
+            delay(2, function()
+                statusLabel.Text = "Готов"
+            end)
+            return
+        end
+
+        settings.attackCount = count
+        attackButton.Text = "Атака..."
+        statusLabel.Text = "Выполняется атака..."
+        
+        local enemyList = FindEnemies(settings.selectedEnemy)
+        local success, message = AttackEnemies(enemyList, settings.attackCount)
+        
+        delay(settings.attackCount * 0.1 + 1, function()
+            attackButton.Text = "Атаковать выбранных"
+            statusLabel.Text = message
+            delay(2, function()
+                if statusLabel.Text == message then
+                    statusLabel.Text = "Готов"
+                end
+            end)
+        end)
+    end)
+
+    -- Атака всех
+    attackAllButton.MouseButton1Click:Connect(function()
+        local count = tonumber(countInput.Text)
+        if not count or count <= 0 then
+            statusLabel.Text = "Неверное количество атак!"
+            delay(2, function()
+                statusLabel.Text = "Готов"
+            end)
+            return
+        end
+
+        settings.attackCount = count
+        attackAllButton.Text = "Атака..."
+        statusLabel.Text = "Выполняется атака всех..."
+        
+        local allEnemies = FindAllEnemies()
+        local success, message = AttackEnemies(allEnemies, settings.attackCount)
+        
+        delay(settings.attackCount * 0.1 + 1, function()
+            attackAllButton.Text = "Атаковать всех"
+            statusLabel.Text = message
+            delay(2, function()
+                if statusLabel.Text == message then
+                    statusLabel.Text = "Готов"
+                end
+            end)
+        end)
+    end)
+
+    -- Переключение автоатаки
+    autoAttackButton.MouseButton1Click:Connect(function()
+        if autoAttackEnabled then
+            StopAutoAttack()
+            autoAttackButton.Text = "Автоатака выкл"
+            autoAttackButton.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
+            statusLabel.Text = "Автоатака отключена"
+            delay(2, function()
+                statusLabel.Text = "Готов"
+            end)
+        else
+            local count = tonumber(countInput.Text)
+            if not count or count <= 0 then
+                statusLabel.Text = "Неверное количество атак!"
+                delay(2, function()
+                    statusLabel.Text = "Готов"
+                end)
+                return
+            end
+            
+            settings.attackCount = count
+            StartAutoAttack()
+            autoAttackButton.Text = "Автоатака вкл"
+            autoAttackButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+            statusLabel.Text = "Автоатака запущена"
+        end
+    end)
+
+    -- Выпадающее меню
+    enemyDropdown.MouseButton1Click:Connect(function()
+        local dropdownFrame = Instance.new("Frame")
+        dropdownFrame.Size = UDim2.new(0, 140, 0, 200)
+        dropdownFrame.Position = UDim2.new(0.5, 0, 0, 85)
+        dropdownFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        dropdownFrame.Parent = mainFrame
+
+        local scrollingFrame = Instance.new("ScrollingFrame")
+        scrollingFrame.Size = UDim2.new(1, 0, 1, 0)
+        scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #enemyTypes * 25)
+        scrollingFrame.Parent = dropdownFrame
+
+        for i, enemy in ipairs(enemyTypes) do
+            local button = Instance.new("TextButton")
+            button.Size = UDim2.new(1, 0, 0, 25)
+            button.Position = UDim2.new(0, 0, 0, (i-1) * 25)
+            button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            button.TextColor3 = Color3.fromRGB(255, 255, 255)
+            button.Text = enemy
+            button.Parent = scrollingFrame
+
+            button.MouseButton1Click:Connect(function()
+                settings.selectedEnemy = enemy
+                enemyDropdown.Text = enemy
+                dropdownFrame:Destroy()
+                if autoAttackEnabled then
+                    StopAutoAttack()
+                    StartAutoAttack()
+                end
+            end)
+        end
+    end)
+
+    screenGui.Parent = player.PlayerGui
+end
+
+-- Инициализация
+local function Initialize()
+    CreateGUI()
+    UserInputService.InputBegan:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.P then
+            if screenGui then
+                StopAutoAttack()
+                screenGui:Destroy()
+                screenGui = nil
+            else
+                CreateGUI()
+            end
+        end
+    end)
+    print("Система атаки запущена! Нажмите 'P' для открытия/закрытия меню.")
+end
+
+Initialize()
