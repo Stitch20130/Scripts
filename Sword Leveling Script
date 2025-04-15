@@ -13,14 +13,31 @@ local enemyTypes = {}
 
 -- Настройки
 local settings = {
-    selectedEnemy = nil, -- Будет установлен после загрузки врагов
+    selectedEnemy = nil,
     attackCount = 10
 }
+
+-- Функция для форматирования здоровья
+local function FormatHealth(health)
+    if not health or health == "N/A" then return "N/A" end
+    health = tonumber(health)
+    if health >= 1e12 then
+        return string.format("%.1fT", health / 1e12)
+    elseif health >= 1e9 then
+        return string.format("%.1fB", health / 1e9)
+    elseif health >= 1e6 then
+        return string.format("%.1fM", health / 1e6)
+    elseif health >= 1e3 then
+        return string.format("%.1fK", health / 1e3)
+    else
+        return tostring(health)
+    end
+end
 
 -- Функция для автоматического заполнения списка врагов
 local function LoadEnemyTypes()
     local enemiesFolder = workspace:WaitForChild("Enemies")
-    enemyTypes = {} -- Очищаем список
+    enemyTypes = {}
     
     for _, folder in pairs(enemiesFolder:GetChildren()) do
         if folder:IsA("Folder") then
@@ -28,13 +45,27 @@ local function LoadEnemyTypes()
         end
     end
     
-    -- Сортировка для удобства
     table.sort(enemyTypes)
     
-    -- Устанавливаем первого врага как выбранного, если список не пуст
     if #enemyTypes > 0 then
         settings.selectedEnemy = enemyTypes[1]
     end
+    
+    return enemyTypes
+end
+
+-- Функция получения здоровья врага
+local function GetEnemyHealth(enemyFolder)
+    local health = "N/A"
+    for _, enemy in pairs(enemyFolder:GetChildren()) do
+        local humanoid = enemy:FindFirstChild("Humanoid")
+        if humanoid then
+            local healthAttr = humanoid:GetAttribute("Game Health") or humanoid.Health
+            health = tostring(math.floor(healthAttr))
+            break
+        end
+    end
+    return health
 end
 
 -- Функция для перетаскивания
@@ -153,7 +184,7 @@ local function StartAutoAttack()
             if #enemies > 0 then
                 AttackEnemies(enemies, settings.attackCount)
             end
-            wait(0.5) -- Проверка каждые 0.5 секунды
+            wait(0.5)
         end
     end)
     coroutine.resume(autoAttackCoroutine)
@@ -167,6 +198,15 @@ local function StopAutoAttack()
     end
 end
 
+-- Функция открытия яйца
+local function OpenEgg()
+    local args = {
+        [1] = "Huge Pixel Hydra",
+        [2] = "Single"
+    }
+    game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("EggOpened"):InvokeServer(unpack(args))
+end
+
 -- Создание GUI
 local function CreateGUI()
     if screenGui then screenGui:Destroy() end
@@ -176,8 +216,8 @@ local function CreateGUI()
     screenGui.ResetOnSpawn = false
 
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 300, 0, 380)
-    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -190)
+    mainFrame.Size = UDim2.new(0, 300, 0, 440)
+    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -220)
     mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     mainFrame.BorderSizePixel = 2
     mainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
@@ -194,6 +234,7 @@ local function CreateGUI()
     titleLabel.TextSize = 20
     titleLabel.Font = Enum.Font.SourceSansBold
     titleLabel.Text = "Система атаки"
+    titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
     titleLabel.Parent = mainFrame
 
     -- Кнопка закрытия
@@ -215,6 +256,7 @@ local function CreateGUI()
     enemyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     enemyLabel.TextSize = 14
     enemyLabel.Text = "Тип врага:"
+    enemyLabel.TextTruncate = Enum.TextTruncate.AtEnd
     enemyLabel.Parent = mainFrame
 
     local enemyDropdown = Instance.new("TextButton")
@@ -224,56 +266,84 @@ local function CreateGUI()
     enemyDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
     enemyDropdown.TextSize = 14
     enemyDropdown.Text = settings.selectedEnemy or "Выберите врага"
+    enemyDropdown.TextTruncate = Enum.TextTruncate.AtEnd
     enemyDropdown.Parent = mainFrame
+
+    -- Здоровье врага
+    local healthLabel = Instance.new("TextLabel")
+    healthLabel.Size = UDim2.new(1, -10, 0, 30)
+    healthLabel.Position = UDim2.new(0, 5, 0, 95)
+    healthLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    healthLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    healthLabel.TextSize = 14
+    healthLabel.Text = "Здоровье: " .. (settings.selectedEnemy and FormatHealth(GetEnemyHealth(workspace.Enemies:FindFirstChild(settings.selectedEnemy))) or "N/A")
+    healthLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    healthLabel.Parent = mainFrame
 
     -- Количество атак
     local countLabel = Instance.new("TextLabel")
     countLabel.Size = UDim2.new(0.5, -10, 0, 30)
-    countLabel.Position = UDim2.new(0, 10, 0, 95)
+    countLabel.Position = UDim2.new(0, 10, 0, 135)
     countLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     countLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     countLabel.TextSize = 14
     countLabel.Text = "Кол-во атак:"
+    countLabel.TextTruncate = Enum.TextTruncate.AtEnd
     countLabel.Parent = mainFrame
 
     local countInput = Instance.new("TextBox")
     countInput.Size = UDim2.new(0.5, -10, 0, 30)
-    countInput.Position = UDim2.new(0.5, 0, 0, 95)
+    countInput.Position = UDim2.new(0.5, 0, 0, 135)
     countInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     countInput.TextColor3 = Color3.fromRGB(255, 255, 255)
     countInput.TextSize = 14
     countInput.Text = tostring(settings.attackCount)
+    countInput.TextTruncate = Enum.TextTruncate.AtEnd
     countInput.Parent = mainFrame
 
     -- Кнопка атаки выбранного типа
     local attackButton = Instance.new("TextButton")
-    attackButton.Size = UDim2.new(0.9, 0, 0, 30)
-    attackButton.Position = UDim2.new(0.05, 0, 0, 135)
+    attackButton.Size = UDim2.new(1, -20, 0, 30)
+    attackButton.Position = UDim2.new(0, 10, 0, 175)
     attackButton.BackgroundColor3 = Color3.fromRGB(60, 90, 180)
     attackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     attackButton.TextSize = 16
     attackButton.Text = "Атаковать выбранных"
+    attackButton.TextTruncate = Enum.TextTruncate.AtEnd
     attackButton.Parent = mainFrame
 
     -- Кнопка атаки всех
     local attackAllButton = Instance.new("TextButton")
-    attackAllButton.Size = UDim2.new(0.9, 0, 0, 30)
-    attackAllButton.Position = UDim2.new(0.05, 0, 0, 175)
+    attackAllButton.Size = UDim2.new(1, -20, 0, 30)
+    attackAllButton.Position = UDim2.new(0, 10, 0, 215)
     attackAllButton.BackgroundColor3 = Color3.fromRGB(120, 60, 180)
     attackAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     attackAllButton.TextSize = 16
     attackAllButton.Text = "Атаковать всех"
+    attackAllButton.TextTruncate = Enum.TextTruncate.AtEnd
     attackAllButton.Parent = mainFrame
 
     -- Кнопка автоатаки
     local autoAttackButton = Instance.new("TextButton")
-    autoAttackButton.Size = UDim2.new(0.9, 0, 0, 30)
-    autoAttackButton.Position = UDim2.new(0.05, 0, 0, 215)
+    autoAttackButton.Size = UDim2.new(1, -20, 0, 30)
+    autoAttackButton.Position = UDim2.new(0, 10, 0, 255)
     autoAttackButton.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
     autoAttackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     autoAttackButton.TextSize = 16
     autoAttackButton.Text = "Автоатака выкл"
+    autoAttackButton.TextTruncate = Enum.TextTruncate.AtEnd
     autoAttackButton.Parent = mainFrame
+
+    -- Кнопка получения пета
+    local openEggButton = Instance.new("TextButton")
+    openEggButton.Size = UDim2.new(1, -20, 0, 30)
+    openEggButton.Position = UDim2.new(0, 10, 0, 295)
+    openEggButton.BackgroundColor3 = Color3.fromRGB(180, 120, 60)
+    openEggButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    openEggButton.TextSize = 16
+    openEggButton.Text = "Получить лучшего пета"
+    openEggButton.TextTruncate = Enum.TextTruncate.AtEnd
+    openEggButton.Parent = mainFrame
 
     -- Статус
     local statusLabel = Instance.new("TextLabel")
@@ -284,6 +354,7 @@ local function CreateGUI()
     statusLabel.TextSize = 14
     statusLabel.Text = "Готов"
     statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+    statusLabel.TextTruncate = Enum.TextTruncate.AtEnd
     statusLabel.Parent = mainFrame
 
     -- Обработчики событий
@@ -322,6 +393,7 @@ local function CreateGUI()
         delay(settings.attackCount * 0.1 + 1, function()
             attackButton.Text = "Атаковать выбранных"
             statusLabel.Text = message
+            healthLabel.Text = "Здоровье: " .. FormatHealth(GetEnemyHealth(workspace.Enemies:FindFirstChild(settings.selectedEnemy)))
             delay(2, function()
                 if statusLabel.Text == message then
                     statusLabel.Text = "Готов"
@@ -351,6 +423,7 @@ local function CreateGUI()
         delay(settings.attackCount * 0.1 + 1, function()
             attackAllButton.Text = "Атаковать всех"
             statusLabel.Text = message
+            healthLabel.Text = "Здоровье: " .. FormatHealth(GetEnemyHealth(workspace.Enemies:FindFirstChild(settings.selectedEnemy)))
             delay(2, function()
                 if statusLabel.Text == message then
                     statusLabel.Text = "Готов"
@@ -395,10 +468,52 @@ local function CreateGUI()
         end
     end)
 
+    -- Открытие яйца
+    openEggButton.MouseButton1Click:Connect(function()
+        OpenEgg()
+        statusLabel.Text = "Пет получен!"
+        delay(2, function()
+            statusLabel.Text = "Готов"
+        end)
+    end)
+
     -- Выпадающее меню
+    local dropdownFrame = nil
+    local enemyHealthCache = {} -- Кэш здоровья для выпадающего меню
+    
+    local function CacheEnemyHealth()
+        for _, enemy in ipairs(enemyTypes) do
+            local enemyFolder = workspace.Enemies:FindFirstChild(enemy)
+            if enemyFolder then
+                enemyHealthCache[enemy] = GetEnemyHealth(enemyFolder)
+            end
+        end
+    end
+
+    local function CloseDropdown()
+        if dropdownFrame then
+            dropdownFrame:Destroy()
+            dropdownFrame = nil
+        end
+    end
+
     enemyDropdown.MouseButton1Click:Connect(function()
-        local dropdownFrame = Instance.new("Frame")
-        dropdownFrame.Size = UDim2.new(0, 140, 0, 200)
+        CloseDropdown()
+        CacheEnemyHealth() -- Обновляем кэш здоровья при открытии меню
+        
+        -- Вычисляем максимальную длину имени
+        local maxLength = 0
+        for _, enemy in ipairs(enemyTypes) do
+            local displayText = enemy .. " (HP: " .. FormatHealth(enemyHealthCache[enemy]) .. ")"
+            maxLength = math.max(maxLength, #displayText)
+        end
+        
+        -- Рассчитываем ширину и высоту меню
+        local dropdownWidth = math.max(200, maxLength * 8 + 20)
+        local dropdownHeight = math.min(200, #enemyTypes * 25 + 10)
+        
+        dropdownFrame = Instance.new("Frame")
+        dropdownFrame.Size = UDim2.new(0, dropdownWidth, 0, dropdownHeight)
         dropdownFrame.Position = UDim2.new(0.5, 0, 0, 85)
         dropdownFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         dropdownFrame.Parent = mainFrame
@@ -406,21 +521,27 @@ local function CreateGUI()
         local scrollingFrame = Instance.new("ScrollingFrame")
         scrollingFrame.Size = UDim2.new(1, 0, 1, 0)
         scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #enemyTypes * 25)
+        scrollingFrame.ScrollBarThickness = 5
+        scrollingFrame.BackgroundTransparency = 1
         scrollingFrame.Parent = dropdownFrame
 
         for i, enemy in ipairs(enemyTypes) do
             local button = Instance.new("TextButton")
-            button.Size = UDim2.new(1, 0, 0, 25)
+            button.Size = UDim2.new(1, -5, 0, 25)
             button.Position = UDim2.new(0, 0, 0, (i-1) * 25)
             button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
             button.TextColor3 = Color3.fromRGB(255, 255, 255)
-            button.Text = enemy
+            button.TextSize = 14
+            button.Text = enemy .. " (HP: " .. FormatHealth(enemyHealthCache[enemy]) .. ")"
+            button.TextXAlignment = Enum.TextXAlignment.Left
+            button.TextScaled = false
             button.Parent = scrollingFrame
 
             button.MouseButton1Click:Connect(function()
                 settings.selectedEnemy = enemy
                 enemyDropdown.Text = enemy
-                dropdownFrame:Destroy()
+                healthLabel.Text = "Здоровье: " .. FormatHealth(GetEnemyHealth(workspace.Enemies:FindFirstChild(enemy)))
+                CloseDropdown()
                 if autoAttackEnabled then
                     StopAutoAttack()
                     StartAutoAttack()
@@ -429,12 +550,38 @@ local function CreateGUI()
         end
     end)
 
+    -- Закрытие выпадающего меню при клике вне его
+    UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if dropdownFrame then
+                local mousePos = input.Position
+                local framePos = dropdownFrame.AbsolutePosition
+                local frameSize = dropdownFrame.AbsoluteSize
+                
+                if mousePos.X < framePos.X or mousePos.X > framePos.X + frameSize.X or
+                   mousePos.Y < framePos.Y or mousePos.Y > framePos.Y + frameSize.Y then
+                    CloseDropdown()
+                end
+            end
+        end
+    end)
+
+    -- Обновление здоровья в главном меню
+    RunService.Heartbeat:Connect(function()
+        if settings.selectedEnemy and screenGui then
+            local enemyFolder = workspace.Enemies:FindFirstChild(settings.selectedEnemy)
+            if enemyFolder then
+                healthLabel.Text = "Здоровье: " .. FormatHealth(GetEnemyHealth(enemyFolder))
+            end
+        end
+    end)
+
     screenGui.Parent = player.PlayerGui
 end
 
 -- Инициализация
 local function Initialize()
-    LoadEnemyTypes() -- Загружаем врагов при запуске
+    LoadEnemyTypes()
     CreateGUI()
     UserInputService.InputBegan:Connect(function(input)
         if input.KeyCode == Enum.KeyCode.P then
