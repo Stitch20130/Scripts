@@ -8,21 +8,34 @@ local screenGui = nil
 local autoAttackEnabled = false
 local autoAttackCoroutine = nil
 
--- Список доступных врагов
-local enemyTypes = {
-    "Assassin", "AssassinBoss", "AssassinMaster", "Bandit", "BanditBerserker",
-    "BanditBoss", "BanditScout", "Barrels", "Crates", "DarkKnight",
-    "DarkSamurai", "Dummies", "Knight", "KnightBoss", "KnightCommander",
-    "Ninja", "NinjaBoss", "Pirate", "PirateBoss", "PirateBrute",
-    "PirateCaptain", "RedNinja", "Samurai", "SamuraiBoss", "SamuraiMaster",
-    "ShadowAssassin", "YellowNinja"
-}
+-- Список доступных врагов (будет заполнен автоматически)
+local enemyTypes = {}
 
 -- Настройки
 local settings = {
-    selectedEnemy = "AssassinBoss",
+    selectedEnemy = nil, -- Будет установлен после загрузки врагов
     attackCount = 10
 }
+
+-- Функция для автоматического заполнения списка врагов
+local function LoadEnemyTypes()
+    local enemiesFolder = workspace:WaitForChild("Enemies")
+    enemyTypes = {} -- Очищаем список
+    
+    for _, folder in pairs(enemiesFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            table.insert(enemyTypes, folder.Name)
+        end
+    end
+    
+    -- Сортировка для удобства
+    table.sort(enemyTypes)
+    
+    -- Устанавливаем первого врага как выбранного, если список не пуст
+    if #enemyTypes > 0 then
+        settings.selectedEnemy = enemyTypes[1]
+    end
+end
 
 -- Функция для перетаскивания
 local function MakeDraggable(frame)
@@ -163,7 +176,7 @@ local function CreateGUI()
     screenGui.ResetOnSpawn = false
 
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 300, 0, 380) -- Увеличил высоту для новой кнопки
+    mainFrame.Size = UDim2.new(0, 300, 0, 380)
     mainFrame.Position = UDim2.new(0.5, -150, 0.5, -190)
     mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     mainFrame.BorderSizePixel = 2
@@ -210,7 +223,7 @@ local function CreateGUI()
     enemyDropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     enemyDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
     enemyDropdown.TextSize = 14
-    enemyDropdown.Text = settings.selectedEnemy
+    enemyDropdown.Text = settings.selectedEnemy or "Выберите врага"
     enemyDropdown.Parent = mainFrame
 
     -- Количество атак
@@ -282,6 +295,14 @@ local function CreateGUI()
 
     -- Атака выбранного типа
     attackButton.MouseButton1Click:Connect(function()
+        if not settings.selectedEnemy then
+            statusLabel.Text = "Выберите тип врага!"
+            delay(2, function()
+                statusLabel.Text = "Готов"
+            end)
+            return
+        end
+
         local count = tonumber(countInput.Text)
         if not count or count <= 0 then
             statusLabel.Text = "Неверное количество атак!"
@@ -349,6 +370,14 @@ local function CreateGUI()
                 statusLabel.Text = "Готов"
             end)
         else
+            if not settings.selectedEnemy then
+                statusLabel.Text = "Выберите тип врага!"
+                delay(2, function()
+                    statusLabel.Text = "Готов"
+                end)
+                return
+            end
+
             local count = tonumber(countInput.Text)
             if not count or count <= 0 then
                 statusLabel.Text = "Неверное количество атак!"
@@ -405,6 +434,7 @@ end
 
 -- Инициализация
 local function Initialize()
+    LoadEnemyTypes() -- Загружаем врагов при запуске
     CreateGUI()
     UserInputService.InputBegan:Connect(function(input)
         if input.KeyCode == Enum.KeyCode.P then
